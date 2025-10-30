@@ -1,0 +1,40 @@
+# MCP Guardian Configuration
+# This file is optional. If not provided, sensible defaults will be used.
+
+# Admin interface configuration
+admin:
+  # Password for HTTP Basic Auth (optional)
+  # If not set, a random password will be generated and logged at startup
+  password: "lol123"
+  
+  # Set to true to completely disable the admin UI and API
+  # Useful for production deployments where services are managed via config only
+  disable_ui: false
+
+# Polling and scheduling configuration
+polling:
+  # How often the schedulers run (seconds)
+  interval_seconds: 60
+  
+  # Minimum check frequency allowed for services (minutes)
+  min_check_frequency: 5
+
+# Database configuration
+database:
+  # SQLite is recommended for single-instance deployments
+  url: "sqlite+aiosqlite:///./mcp_guardian.db"
+  # For PostgreSQL: "postgresql+asyncpg://user:pass@host/db"
+
+# Pre-configured MCP services (optional)
+# These will be automatically added to the database on startup
+# if a service with the same name doesn't already exist
+services:
+  - name: "langchain"
+    upstream_url: "https://docs.langchain.com/mcp"
+    enabled: true
+    check_frequency_minutes: 5
+  
+  # - name: "another-service"
+  #   upstream_url: "https://mcp.example.com/mcp"
+  #   enabled: false
+  #   check_frequency_minutes: 60

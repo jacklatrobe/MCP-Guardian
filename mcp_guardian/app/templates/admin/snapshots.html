@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Guardian - Service Details</title>
+    <link rel="stylesheet" href="/static/admin/admin.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛡️ MCP Guardian</h1>
+            <p class="subtitle"><a href="/ADMIN/">← Back to Services</a></p>
+        </header>
+
+        <main>
+            <div id="serviceDetails">
+                <p class="loading">Loading service details...</p>
+            </div>            <section class="card">
+                <h2>Recent Snapshots</h2>
+                <div id="snapshotsContainer">
+                    <p class="loading">Loading snapshots...</p>
+                </div>
+            </section>
+        </main>
+
+        <!-- Modal for viewing snapshot JSON -->
+        <div id="snapshotModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeSnapshotModal()">&times;</span>
+                <h2>Snapshot Details</h2>
+                <div id="modalSnapshotContent">
+                    <p class="loading">Loading snapshot...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SERVICE_NAME = "{{ service_name }}";
+    </script>    <script src="/static/admin/admin.js"></script>
+    <script>        // Load service details on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadServiceDetails();
+            loadSnapshots();
+        });
+
+        async function loadServiceDetails() {
+            try {
+                const response = await fetchWithAuth(`/api/admin/services/${SERVICE_NAME}`);
+                const service = await response.json();
+                
+                const detailsHtml = `
+                    <div class="service-header">
+                        <h2>${service.name}</h2>
+                        <span class="badge ${service.enabled ? 'badge-success' : 'badge-warning'}">
+                            ${service.enabled ? 'Enabled' : 'Disabled'}
+                        </span>
+                    </div>
+                    <div class="service-info">
+                        <p><strong>Upstream URL:</strong> ${service.upstream_url}</p>
+                        <p><strong>Check Frequency:</strong> ${service.check_frequency_minutes} minutes</p>
+                        <p><strong>Created:</strong> ${new Date(service.created_at).toLocaleString()}</p>
+                        <p><strong>Updated:</strong> ${new Date(service.updated_at).toLocaleString()}</p>
+                    </div>
+                    <div class="service-actions">
+                        <button class="btn ${service.enabled ? 'btn-warning' : 'btn-success'}" 
+                                onclick="toggleService('${service.name}', ${!service.enabled})">
+                            ${service.enabled ? 'Disable' : 'Enable'}
+                        </button>
+                        <button class="btn btn-primary" onclick="approveService('${service.name}')">
+                            ✓ Approve Latest Snapshot
+                        </button>
+                        <button class="btn btn-danger" onclick="deleteService('${service.name}')">
+                            🗑️ Delete Service
+                        </button>
+                    </div>
+                `;
+                
+                document.getElementById('serviceDetails').innerHTML = detailsHtml;
+            } catch (error) {
+                document.getElementById('serviceDetails').innerHTML = 
+                    `<p class="error">Error loading service: ${error.message}</p>`;
+            }
+        }
+
+        async function loadSnapshots() {
+            try {
+                const response = await fetchWithAuth(`/api/admin/services/${SERVICE_NAME}/snapshots?limit=10`);
+                const snapshots = await response.json();
+                
+                if (snapshots.length === 0) {
+                    document.getElementById('snapshotsContainer').innerHTML = 
+                        '<p>No snapshots found</p>';
+                    return;
+                }
+                  const snapshotsHtml = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Created</th>
+                                <th>Hash</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${snapshots.map(s => `
+                                <tr>
+                                    <td>${new Date(s.created_at).toLocaleString()}</td>
+                                    <td><code>${s.snapshot_hash.substring(0, 16)}...</code></td>
+                                    <td><span class="badge badge-${getStatusColor(s.approved_status)}">${s.approved_status}</span></td>
+                                    <td><button class="btn btn-primary btn-sm" onclick="viewSnapshot(${s.id})">View JSON</button></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                  document.getElementById('snapshotsContainer').innerHTML = snapshotsHtml;
+            } catch (error) {
+                document.getElementById('snapshotsContainer').innerHTML = 
+                    `<p class="error">Error loading snapshots: ${error.message}</p>`;            }
+        }
+
+        async function viewSnapshot(snapshotId) {
+            const modal = document.getElementById('snapshotModal');
+            const content = document.getElementById('modalSnapshotContent');            modal.style.display = 'block';
+            content.innerHTML = '<p class="loading">Loading snapshot...</p>';
+              console.log('SERVICE_NAME:', SERVICE_NAME);
+            console.log('snapshotId:', snapshotId);
+            console.log('URL:', `/api/admin/services/${SERVICE_NAME}/snapshots/${snapshotId}`);
+            
+            try {
+                const response = await fetchWithAuth(`/api/admin/services/${SERVICE_NAME}/snapshots/${snapshotId}`);
+                
+                console.log('Response status:', response.status);
+                console.log('Response ok:', response.ok);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    content.innerHTML = `<p class="error">Failed to load snapshot (${response.status}): ${errorText}</p>`;
+                    return;
+                }
+                
+                const snapshot = await response.json();
+                
+                console.log('Snapshot response:', snapshot);
+                console.log('snapshot_json type:', typeof snapshot.snapshot_json);
+                console.log('snapshot_json value:', snapshot.snapshot_json);
+                
+                // Parse the snapshot JSON (handle both string and already-parsed object)
+                let snapshotData;
+                if (typeof snapshot.snapshot_json === 'string') {
+                    if (snapshot.snapshot_json.trim() === '') {
+                        content.innerHTML = `<p class="error">Snapshot data is empty</p>`;
+                        return;
+                    }
+                    try {
+                        snapshotData = JSON.parse(snapshot.snapshot_json);
+                    } catch (e) {
+                        content.innerHTML = `<p class="error">Error parsing snapshot JSON: ${e.message}<br><br>Raw data: <pre>${snapshot.snapshot_json.substring(0, 500)}</pre></p>`;
+                        return;
+                    }
+                } else if (typeof snapshot.snapshot_json === 'object' && snapshot.snapshot_json !== null) {
+                    // Already parsed
+                    snapshotData = snapshot.snapshot_json;
+                } else {
+                    content.innerHTML = `<p class="error">Invalid snapshot data type: ${typeof snapshot.snapshot_json}</p>`;
+                    return;
+                }
+                
+                console.log('Parsed snapshotData:', snapshotData);
+                
+                // Validate snapshotData exists
+                if (!snapshotData) {
+                    content.innerHTML = `<p class="error">No snapshot data available</p>`;
+                    return;
+                }
+                
+                // Create a nicely formatted view
+                let html = '<div class="snapshot-details">';
+                html += `<div class="snapshot-meta">`;
+                html += `<p><strong>Snapshot ID:</strong> ${snapshot.id}</p>`;
+                html += `<p><strong>Hash:</strong> <code>${snapshot.snapshot_hash}</code></p>`;
+                html += `<p><strong>Status:</strong> <span class="badge badge-${getStatusColor(snapshot.approved_status)}">${snapshot.approved_status}</span></p>`;
+                html += `<p><strong>Created:</strong> ${new Date(snapshot.created_at).toLocaleString()}</p>`;
+                html += `</div>`;
+                
+                // Show tools
+                if (snapshotData.tools && snapshotData.tools.length > 0) {
+                    html += '<div class="snapshot-section">';
+                    html += `<h3>Tools (${snapshotData.tools.length})</h3>`;
+                    html += '<div class="tool-list">';
+                    snapshotData.tools.forEach(tool => {
+                        html += '<div class="tool-item">';
+                        html += `<h4>${tool.name}</h4>`;
+                        if (tool.description) {
+                            html += `<p>${tool.description}</p>`;
+                        }
+                        if (tool.inputSchema) {
+                            html += '<details>';
+                            html += '<summary>Input Schema</summary>';
+                            html += `<pre>${JSON.stringify(tool.inputSchema, null, 2)}</pre>`;
+                            html += '</details>';
+                        }
+                        html += '</div>';
+                    });
+                    html += '</div></div>';
+                } else {
+                    html += '<p>No tools defined</p>';
+                }
+                
+                // Show resources
+                if (snapshotData.resources && snapshotData.resources.length > 0) {
+                    html += '<div class="snapshot-section">';
+                    html += `<h3>Resources (${snapshotData.resources.length})</h3>`;
+                    html += '<div class="resource-list">';
+                    snapshotData.resources.forEach(resource => {
+                        html += '<div class="resource-item">';
+                        html += `<h4>${resource.name || resource.uri}</h4>`;
+                        if (resource.description) {
+                            html += `<p>${resource.description}</p>`;
+                        }
+                        if (resource.uri) {
+                            html += `<p><code>${resource.uri}</code></p>`;
+                        }
+                        if (resource.mimeType) {
+                            html += `<p><em>MIME Type:</em> ${resource.mimeType}</p>`;
+                        }
+                        html += '</div>';
+                    });
+                    html += '</div></div>';
+                } else {
+                    html += '<p>No resources defined</p>';
+                }
+                
+                // Show prompts
+                if (snapshotData.prompts && snapshotData.prompts.length > 0) {
+                    html += '<div class="snapshot-section">';
+                    html += `<h3>Prompts (${snapshotData.prompts.length})</h3>`;
+                    html += '<div class="prompt-list">';
+                    snapshotData.prompts.forEach(prompt => {
+                        html += '<div class="prompt-item">';
+                        html += `<h4>${prompt.name}</h4>`;
+                        if (prompt.description) {
+                            html += `<p>${prompt.description}</p>`;
+                        }
+                        if (prompt.arguments) {
+                            html += '<details>';
+                            html += '<summary>Arguments</summary>';
+                            html += `<pre>${JSON.stringify(prompt.arguments, null, 2)}</pre>`;
+                            html += '</details>';
+                        }
+                        html += '</div>';
+                    });
+                    html += '</div></div>';
+                } else {
+                    html += '<p>No prompts defined</p>';
+                }
+                
+                // Raw JSON view
+                html += '<div class="snapshot-section">';
+                html += '<details>';
+                html += '<summary><strong>View Raw JSON</strong></summary>';
+                html += `<pre class="json-dump">${JSON.stringify(snapshotData, null, 2)}</pre>`;
+                html += '</details>';
+                html += '</div>';
+                
+                html += '</div>';
+                
+                content.innerHTML = html;
+            } catch (error) {
+                content.innerHTML = `<p class="error">Error loading snapshot: ${error.message}</p>`;
+            }
+        }
+
+        function closeSnapshotModal() {
+            document.getElementById('snapshotModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('snapshotModal');
+            if (event.target == modal) {
+                closeSnapshotModal();
+            }
+        }
+
+        function getStatusColor(status) {
+            switch (status) {
+                case 'user_approved': return 'success';
+                case 'system_approved': return 'info';
+                case 'unapproved': return 'warning';
+                default: return 'secondary';
+            }
+        }
+
+        async function approveService(name) {
+            if (!confirm(`Approve latest snapshot and re-enable service "${name}"?`)) return;
+            
+            try {
+                const response = await fetchWithAuth(`/api/admin/services/${name}/approve`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    alert('Service approved and re-enabled!');
+                    location.reload();
+                } else {
+                    const error = await response.json();
+                    alert(`Error: ${error.detail}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        async function toggleService(name, enable) {
+            try {
+                const response = await fetchWithAuth(`/api/admin/services/${name}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: enable })
+                });
+                
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    const error = await response.json();
+                    alert(`Error: ${error.detail}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        async function deleteService(name) {
+            if (!confirm(`Delete service "${name}" and all its snapshots? This cannot be undone!`)) return;
+            
+            try {
+                const response = await fetchWithAuth(`/api/admin/services/${name}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    window.location.href = '/ADMIN/';
+                } else {
+                    const error = await response.json();
+                    alert(`Error: ${error.detail}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

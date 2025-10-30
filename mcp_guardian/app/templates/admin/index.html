@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Guardian - Admin</title>
+    <link rel="stylesheet" href="/static/admin/admin.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛡️ MCP Guardian</h1>
+            <p class="subtitle">MCP Proxy with Capability Validation</p>
+        </header>
+
+        <main>
+            <div class="actions">
+                <button id="addServiceBtn" class="btn btn-primary">➕ Add Service</button>
+                <button id="refreshBtn" class="btn">🔄 Refresh</button>
+            </div>
+
+            <div id="servicesContainer">
+                <p class="loading">Loading services...</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add/Edit Service Modal -->
+    <div id="serviceModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="modalTitle">Add Service</h2>
+            <form id="serviceForm">                <div class="form-group">
+                    <label for="serviceName">Service Name *</label>
+                    <input type="text" id="serviceName" name="name" required 
+                           pattern="[a-zA-Z0-9_\-]+" 
+                           placeholder="my-mcp-service">
+                    <small>Only alphanumeric, hyphens, and underscores</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="upstreamUrl">Upstream MCP URL *</label>
+                    <input type="text" id="upstreamUrl" name="upstream_url" required 
+                           placeholder="http://localhost:3000/mcp">
+                </div>
+
+                <div class="form-group">
+                    <label for="checkFrequency">Check Frequency (minutes)</label>
+                    <input type="number" id="checkFrequency" name="check_frequency_minutes" 
+                           value="0" min="0" step="1">
+                    <small>0 = never check, minimum 5 for periodic checks</small>
+                </div>
+
+                <div class="form-group checkbox">
+                    <label>
+                        <input type="checkbox" id="enabled" name="enabled" checked>
+                        Enable service immediately
+                    </label>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn" onclick="closeModal()">Cancel</button>
+                </div>
+            </form>
+            <div id="formError" class="error"></div>
+            <div id="formSuccess" class="success"></div>
+        </div>
+    </div>
+
+    <script src="/static/admin/admin.js"></script>
+</body>
+</html>
