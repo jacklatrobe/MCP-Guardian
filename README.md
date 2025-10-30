@@ -38,12 +38,25 @@ MCP Clients → MCP Guardian → Upstream MCP Servers
 # Build the image
 docker build -t mcp-guardian .
 
-# Run the container
-docker run -p 8000:8000 \
-  -e ADMIN_TOKEN=your-secure-token \
-  -v $(pwd)/data:/app/data \
+# Run with auto-generated password (check logs for password)
+docker run -d \
+  -p 8000:8000 \
+  --name mcp-guardian \
+  mcp-guardian
+
+# View logs to get the generated admin password
+docker logs mcp-guardian
+
+# Or run with custom config.yml
+docker run -d \
+  -p 8000:8000 \
+  -v $(pwd)/config.yml:/app/config.yml:ro \
+  -v mcp-guardian-data:/app/data \
+  --name mcp-guardian \
   mcp-guardian
 ```
+
+**Note**: If you mount a custom `config.yml` with a database path like `/app/data/mcp_guardian.db`, make sure to mount a volume to `/app/data` to persist your database.
 
 ### Using Python
 
@@ -51,10 +64,12 @@ docker run -p 8000:8000 \
 # Install dependencies
 pip install -e .
 
-# Set admin token
-export ADMIN_TOKEN=your-secure-token
+# Run the server (will generate random admin password)
+python -m uvicorn mcp_guardian.app.main:app --host 0.0.0.0 --port 8000
 
-# Run the server
+# Or with custom config
+cp config.yml.example config.yml
+# Edit config.yml with your settings
 python -m uvicorn mcp_guardian.app.main:app --host 0.0.0.0 --port 8000
 ```
 
@@ -117,11 +132,50 @@ python -m uvicorn mcp_guardian.app.main:app --reload
 
 **Production (Docker with mounted config)**:
 ```bash
+# Using a named volume for data persistence
+docker run -d \
+  -p 8000:8000 \
+  -v /path/to/config.yml:/app/config.yml:ro \
+  -v mcp-guardian-data:/app/data \
+  --name mcp-guardian \
+  mcp-guardian:latest
+
+# Or using a bind mount for data
 docker run -d \
   -p 8000:8000 \
   -v /path/to/config.yml:/app/config.yml:ro \
   -v /path/to/data:/app/data \
+  --name mcp-guardian \
   mcp-guardian:latest
+```
+
+**Important**: If your `config.yml` specifies a database path like `/app/data/mcp_guardian.db`, ensure you mount a volume to `/app/data`. If using the default `./mcp_guardian.db`, the database will be created in `/app/` (the container's working directory).
+
+### Using Docker Compose
+
+Create a `docker-compose.yml` file:
+
+```yaml
+version: '3.8'
+
+services:
+  mcp-guardian:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./config.yml:/app/config.yml:ro
+      - mcp-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  mcp-data:
+```
+
+Then run:
+
+```bash
+docker-compose up -d
 ```
 
 **GitOps Friendly**:

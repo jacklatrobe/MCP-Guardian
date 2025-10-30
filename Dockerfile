@@ -15,6 +15,9 @@ COPY mcp_guardian ./mcp_guardian/
 # Install Python dependencies
 RUN pip install --no-cache-dir -e .
 
+# Create directory for database persistence
+RUN mkdir -p /app/data
+
 # Expose port
 EXPOSE 8000
 
@@ -24,4 +27,4 @@ ENV HOST=0.0.0.0
 ENV PORT=8000
 
 # Run the application
-CMD ["python", "-m", "uvicorn", "mcp_guardian.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "python -m uvicorn mcp_guardian.app.main:app --host $HOST --port $PORT"]

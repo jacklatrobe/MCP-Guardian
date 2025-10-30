@@ -27,6 +27,7 @@ polling:
 # Database configuration
 database:
   # SQLite is recommended for single-instance deployments
+  # For Docker, use /app/data/mcp_guardian.db to persist with volume mount
   url: "sqlite+aiosqlite:///./mcp_guardian.db"
   # For PostgreSQL: "postgresql+asyncpg://user:pass@host/db"
 

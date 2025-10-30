@@ -1,4 +1,5 @@
 """Admin UI routes using Jinja2 templates."""
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Request, Depends
@@ -9,8 +10,9 @@ from ..security import get_current_admin
 
 router = APIRouter(prefix="/ADMIN", tags=["admin-ui"])
 
-# Set up templates
-templates = Jinja2Templates(directory="mcp_guardian/app/templates")
+# Set up templates (using absolute path relative to this file)
+templates_dir = Path(__file__).parent.parent / "templates"
+templates = Jinja2Templates(directory=str(templates_dir))
 
 
 @router.get("/", response_class=HTMLResponse, dependencies=[Depends(get_current_admin)])
