@@ -183,43 +183,6 @@ When the periodic checker detects capability changes:
 3. Admin reviews the diff in the UI
 4. Admin clicks **"Approve Latest Snapshot"** to re-enable
 
-### API Endpoints
-
-#### Admin API (requires HTTP Basic Auth)
-
-```
-POST   /api/admin/services              # Create service
-GET    /api/admin/services              # List all services
-GET    /api/admin/services/{name}       # Get service details
-PATCH  /api/admin/services/{name}       # Update service
-DELETE /api/admin/services/{name}       # Delete service
-
-GET    /api/admin/services/{name}/snapshots  # List snapshots
-GET    /api/admin/services/{name}/diff       # Get diff
-POST   /api/admin/services/{name}/approve    # Approve latest snapshot
-```
-
-#### MCP Proxy (no auth - forwarded to upstream)
-
-```
-POST   /{service_name}/mcp    # JSON-RPC requests
-GET    /{service_name}/mcp    # SSE streaming
-DELETE /{service_name}/mcp    # Session termination
-```
-
-**Example MCP client request:**
-
-```bash
-curl -X POST http://localhost:8000/my-service/mcp \
-  -H "Content-Type: application/json" \
-  -H "MCP-Protocol-Version: 2024-11-05" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "tools/list"
-  }'
-```
-
 ## How It Works
 
 ### Initialization Flow
@@ -247,57 +210,12 @@ Every minute (configurable):
 
 1. Client sends request to `/{service_name}/mcp`
 2. Guardian checks route registry for enabled status
-3. If disabled: Return `503 Service Unavailable`
+3. If disabled: Return `HTTP 403 Forbidden`. If not configured, it returns `HTTP 404`.
 4. If enabled: Forward request to upstream, preserving:
    - Headers: `MCP-Protocol-Version`, `Mcp-Session-Id`, `Last-Event-ID`
    - Body: Raw JSON-RPC
    - SSE: Event stream with proper `id:` propagation
 5. Stream response back to client
-
-## Protocol Compliance
-
-MCP Guardian implements **Streamable HTTP** transport from the MCP specification:
-
-- **JSON-RPC 2.0**: All requests/responses follow spec
-- **SSE Support**: Server-sent events with resume semantics
-- **Session Handling**: Session IDs passed through (no virtualization)
-- **Method Support**: `initialize`, `tools/*`, `resources/*`, `prompts/*`
-
-## Development
-
-### Project Structure
-
-```
-mcp_guardian/
-  app/
-    main.py              # FastAPI app + lifespan
-    config.py            # Settings
-    db.py                # Database setup
-    models.py            # SQLAlchemy models
-    schemas.py           # Pydantic schemas
-    routers/
-      admin_api.py       # Admin API endpoints
-      admin_ui.py        # Admin UI routes
-      proxy.py           # MCP proxy endpoint
-    services/
-      canonicalize.py    # RFC 8785 JCS + hashing
-      proxy_client.py    # HTTP client for upstream
-      snapshotter.py     # Capability snapshot logic
-      route_registry.py  # In-memory allow-list
-      diff.py            # JSON diff utilities
-    scheduler/
-      route_poller.py    # Reload routes from DB
-      check_scheduler.py # Periodic capability checks
-    static/admin/        # CSS/JS
-    templates/admin/     # HTML templates
-```
-
-### Running Tests
-
-```bash
-# TODO: Add pytest tests
-pytest
-```
 
 ## Security Considerations (POC)
 
@@ -310,54 +228,6 @@ This is a **Proof of Concept** with basic security:
 - ❌ No audit trail export
 - ❌ No multi-tenant RBAC
 
-**For production:**
-- Deploy behind reverse proxy (Nginx/Caddy) with TLS
-- Implement proper authentication (OAuth2, JWT)
-- Add rate limiting
-- Enable audit logging
-- Restrict CORS origins
-
-## Troubleshooting
-
-### Service won't enable
-
-- Check that upstream MCP server is reachable
-- Verify upstream implements required methods: `initialize`, `tools/list`, `resources/list`, `prompts/list`
-- Check logs for snapshot errors: `docker logs <container>`
-
-### Changes not detected
-
-- Ensure `check_frequency_minutes` > 0
-- Verify scheduler is running (check logs)
-- Compare hashes in snapshots table
-
-### SSE not working
-
-- Ensure `Accept: text/event-stream` header is sent
-- Check that upstream supports SSE
-- Verify no proxy/firewall is buffering responses
-
-## References
-
-- [Model Context Protocol Specification](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports)
-- [RFC 8785: JSON Canonicalization Scheme (JCS)](https://www.rfc-editor.org/rfc/rfc8785)
-- [FastAPI Lifespan Events](https://fastapi.tiangolo.com/advanced/events/)
-- [JSON-RPC 2.0 Specification](https://www.jsonrpc.org/specification)
-
 ## License
 
 See [LICENSE.md](LICENSE.md)
-
-## Contributing
-
-This is a POC implementation. Contributions welcome for:
-- [ ] Comprehensive test suite
-- [ ] Prometheus metrics integration
-- [ ] PostgreSQL support
-- [ ] Horizontal scaling (Redis for session state)
-- [ ] Enhanced authentication/authorization
-- [ ] WebSocket transport support
-
----
-
-**Built with** FastAPI, SQLAlchemy, httpx, sse-starlette, and RFC 8785 JCS 🚀
