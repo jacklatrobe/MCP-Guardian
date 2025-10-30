@@ -120,6 +120,13 @@ function openModal() {
     document.getElementById('serviceForm').reset();
     document.getElementById('formError').textContent = '';
     document.getElementById('formSuccess').textContent = '';
+    
+    // Reset submit button state
+    const submitBtn = document.querySelector('#serviceForm button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save';
+    }
 }
 
 function closeModal() {
