@@ -36,6 +36,12 @@ async def lifespan(app: FastAPI):
     """
     logger.info("Starting MCP Guardian...")
     
+    # Ensure database directory exists
+    db_path_str = settings.database_url.replace("sqlite+aiosqlite://", "")
+    db_path = Path(db_path_str)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Ensured database directory exists: {db_path.parent}")
+    
     # Log admin password (generated or from config)
     if settings.admin.password:
         logger.info("Admin password loaded from config.yml")

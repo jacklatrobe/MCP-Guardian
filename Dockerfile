@@ -17,8 +17,9 @@ COPY mcp_guardian ./mcp_guardian/
 # Install Python dependencies
 RUN pip install --no-cache-dir -e .
 
-# Create directory for database persistence
-RUN mkdir -p /app/data
+# Copy and set up entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Expose port
 EXPOSE 8000
@@ -36,6 +37,8 @@ RUN apt-get autoremove -y && apt-get clean
 # But essentially leaves this image broken.
 RUN rm -f /bin/tar && ln -sf /bin/true /bin/tar && rm -rf /var/lib/apt/lists/*
 
+# Set entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
 
 # Run the application
 CMD ["sh", "-c", "python -m uvicorn mcp_guardian.app.main:app --host $HOST --port $PORT"]

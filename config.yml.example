@@ -27,8 +27,14 @@ polling:
 # Database configuration
 database:
   # SQLite is recommended for single-instance deployments
-  # For Docker, use /app/data/mcp_guardian.db to persist with volume mount
+  # 
+  # For Docker deployments with persistence, use /app/data/:
+  #   url: "sqlite+aiosqlite:////app/data/mcp_guardian.db"
+  #   And ensure you mount a volume to /app/data in docker-compose.yml
+  #
+  # For local development or non-Docker, relative path works fine:
   url: "sqlite+aiosqlite:///./mcp_guardian.db"
+  
   # For PostgreSQL: "postgresql+asyncpg://user:pass@host/db"
 
 # Pre-configured MCP services (optional)

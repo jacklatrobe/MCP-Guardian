@@ -47,7 +47,7 @@ docker run -d \
 # View logs to get the generated admin password
 docker logs mcp-guardian
 
-# Or run with custom config.yml
+# Or run with custom config.yml and persistent data
 docker run -d \
   -p 8000:8000 \
   -v $(pwd)/config.yml:/app/config.yml:ro \
@@ -56,7 +56,11 @@ docker run -d \
   mcp-guardian
 ```
 
-**Note**: If you mount a custom `config.yml` with a database path like `/app/data/mcp_guardian.db`, make sure to mount a volume to `/app/data` to persist your database.
+**Important for Docker Data Persistence**:
+- Use a **named volume** (e.g., `mcp-guardian-data:/app/data`) to persist your database
+- In your `config.yml`, set the database URL to: `sqlite+aiosqlite:////app/data/mcp_guardian.db` (note the 4 slashes for absolute path)
+- The named volume approach works reliably across platforms (Windows, macOS, Linux)
+- Without a volume mount, your database will be lost when the container is removed
 
 ### Using Python
 
@@ -105,7 +109,10 @@ polling:
 
 # Database
 database:
-  url: "sqlite+aiosqlite:///./mcp_guardian.db"
+  # For Docker with persistence (recommended):
+  url: "sqlite+aiosqlite:////app/data/mcp_guardian.db"
+  # For local development:
+  # url: "sqlite+aiosqlite:///./mcp_guardian.db"
 
 # Pre-configured services (optional)
 services:
@@ -132,7 +139,7 @@ python -m uvicorn mcp_guardian.app.main:app --reload
 
 **Production (Docker with mounted config)**:
 ```bash
-# Using a named volume for data persistence
+# Using a named volume for data persistence (recommended)
 docker run -d \
   -p 8000:8000 \
   -v /path/to/config.yml:/app/config.yml:ro \
@@ -140,7 +147,7 @@ docker run -d \
   --name mcp-guardian \
   mcp-guardian:latest
 
-# Or using a bind mount for data
+# Or using a bind mount for data (Linux/macOS)
 docker run -d \
   -p 8000:8000 \
   -v /path/to/config.yml:/app/config.yml:ro \
@@ -149,15 +156,16 @@ docker run -d \
   mcp-guardian:latest
 ```
 
-**Important**: If your `config.yml` specifies a database path like `/app/data/mcp_guardian.db`, ensure you mount a volume to `/app/data`. If using the default `./mcp_guardian.db`, the database will be created in `/app/` (the container's working directory).
+**Important**: 
+- If your `config.yml` specifies a database path like `sqlite+aiosqlite:////app/data/mcp_guardian.db`, you **must** mount a volume to `/app/data` for persistence
+- Use **named volumes** (e.g., `mcp-guardian-data:/app/data`) for best cross-platform compatibility
+- Bind mounts (`./data:/app/data`) can have permission issues on Windows with Docker Desktop
 
 ### Using Docker Compose
 
 Create a `docker-compose.yml` file:
 
 ```yaml
-version: '3.8'
-
 services:
   mcp-guardian:
     build: .
@@ -172,10 +180,15 @@ volumes:
   mcp-data:
 ```
 
+**Key Points**:
+- The `mcp-data` named volume persists your database across container restarts
+- Ensure your `config.yml` has: `database.url: "sqlite+aiosqlite:////app/data/mcp_guardian.db"`
+- Data persists even when running `docker compose down` and `docker compose up --build`
+
 Then run:
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 **GitOps Friendly**:
