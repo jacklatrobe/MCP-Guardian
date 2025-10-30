@@ -142,7 +142,7 @@ Navigate to `http://localhost:8000/ADMIN/` to access the admin interface.
 
 The admin interface provides a dashboard to manage all your MCP services:
 
-![MCP Guardian Admin UI - Service List](docs/admin-ui-2.png)
+![MCP Guardian Admin UI - Service List](docs/admin-ui-1.png)
 
 *Service list showing enabled services with their upstream URLs, check frequencies, and snapshot approval status*
 
@@ -171,7 +171,7 @@ Click **"View"** on any service to see:
 - Diff between approved and latest snapshots
 - Actions: Approve, Enable/Disable, Delete
 
-![MCP Guardian Admin UI - Service Details](docs/admin-ui-1.png)
+![MCP Guardian Admin UI - Service Details](docs/admin-ui-2.png)
 
 *Service detail view showing configuration, snapshot history, and approval status*
 
