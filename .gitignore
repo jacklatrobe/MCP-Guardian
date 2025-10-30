@@ -1,6 +1,7 @@
 # App-specific ignores
 config.yml
 docker-compose.yml
+mcp_guardian.db
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

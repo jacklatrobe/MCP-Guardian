@@ -5,6 +5,7 @@ from typing import List, Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
 from ..config import settings
 from ..db import get_db
@@ -63,27 +64,32 @@ async def create_service(
         logger.error(f"Failed to snapshot {service.upstream_url}: {e}")
         raise HTTPException(status_code=400, detail=f"Failed to snapshot upstream server: {str(e)}")
     
-    # Create service
-    db_service = MCPService(
-        name=service.name,
-        upstream_url=service.upstream_url,
-        enabled=service.enabled,
-        check_frequency_minutes=service.check_frequency_minutes,
-    )
-    db.add(db_service)
-    await db.flush()
-    
-    # Create initial snapshot
-    db_snapshot = MCPSnapshot(
-        service_id=db_service.id,
-        snapshot_json=snapshot_result.snapshot_json,
-        snapshot_hash=snapshot_result.snapshot_hash,
-        approved_status=ApprovalStatus.USER_APPROVED,
-    )
-    db.add(db_snapshot)
-    
-    await db.commit()
-    await db.refresh(db_service)
+    # Create service and snapshot in a transaction
+    try:
+        db_service = MCPService(
+            name=service.name,
+            upstream_url=service.upstream_url,
+            enabled=service.enabled,
+            check_frequency_minutes=service.check_frequency_minutes,
+        )
+        db.add(db_service)
+        await db.flush()
+        
+        # Create initial snapshot
+        db_snapshot = MCPSnapshot(
+            service_id=db_service.id,
+            snapshot_json=snapshot_result.snapshot_json,
+            snapshot_hash=snapshot_result.snapshot_hash,
+            approved_status=ApprovalStatus.USER_APPROVED,
+        )
+        db.add(db_snapshot)
+        
+        await db.commit()
+        await db.refresh(db_service)
+    except IntegrityError as e:
+        await db.rollback()
+        logger.error(f"Integrity error creating service '{service.name}': {e}")
+        raise HTTPException(status_code=400, detail=f"Service '{service.name}' already exists (race condition)")
     
     # Reload route registry
     services = await db.execute(select(MCPService))

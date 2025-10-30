@@ -130,6 +130,12 @@ function closeModal() {
 async function handleServiceSubmit(event) {
     event.preventDefault();
     
+    // Disable submit button to prevent double-submission
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    if (submitBtn.disabled) return; // Already submitting
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating...';
+    
     const formData = new FormData(event.target);
     const data = {
         name: formData.get('name'),
@@ -161,9 +167,15 @@ async function handleServiceSubmit(event) {
         } else {
             const error = await response.json();
             errorDiv.textContent = `Error: ${error.detail}`;
+            // Re-enable button on error
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Create Service';
         }
     } catch (error) {
         errorDiv.textContent = `Error: ${error.message}`;
+        // Re-enable button on error
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create Service';
     }
 }
 
