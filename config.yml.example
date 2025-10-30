@@ -1,6 +1,11 @@
 # MCP Guardian Configuration
 # This file is optional. If not provided, sensible defaults will be used.
 
+# Base URL for MCP Guardian
+# This is used when generating client configuration snippets
+# If not set, defaults to http://localhost:8000
+base_url: "http://localhost:8000"
+
 # Admin interface configuration
 admin:
   # Password for HTTP Basic Auth (optional)

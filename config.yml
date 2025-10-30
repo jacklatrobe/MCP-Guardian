@@ -1,6 +1,11 @@
 # MCP Guardian Configuration
 # This file is optional. If not provided, sensible defaults will be used.
 
+# Base URL for MCP Guardian
+# This is used when generating client configuration snippets
+# If not set, defaults to http://localhost:8000
+base_url: "http://localhost:8000"
+
 # Admin interface configuration
 admin:
   # Password for HTTP Basic Auth (optional)
@@ -28,11 +33,11 @@ database:
 # Pre-configured MCP services (optional)
 # These will be automatically added to the database on startup
 # if a service with the same name doesn't already exist
-services:
-  - name: "langchain"
-    upstream_url: "https://docs.langchain.com/mcp"
-    enabled: true
-    check_frequency_minutes: 5
+#services:
+#  - name: "langchain"
+#    upstream_url: "https://docs.langchain.com/mcp"
+#    enabled: true
+#    check_frequency_minutes: 5
   
   # - name: "another-service"
   #   upstream_url: "https://mcp.example.com/mcp"

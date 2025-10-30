@@ -22,15 +22,47 @@
                     <p class="loading">Loading snapshots...</p>
                 </div>
             </section>
-        </main>
-
-        <!-- Modal for viewing snapshot JSON -->
+        </main>        <!-- Modal for viewing snapshot JSON -->
         <div id="snapshotModal" class="modal">
             <div class="modal-content">
                 <span class="close" onclick="closeSnapshotModal()">&times;</span>
                 <h2>Snapshot Details</h2>
                 <div id="modalSnapshotContent">
                     <p class="loading">Loading snapshot...</p>
+                </div>
+            </div>
+        </div>        <!-- Modal for editing service -->
+        <div id="editModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeEditModal()">&times;</span>
+                <h2>Edit Service</h2>
+                <form id="editServiceForm" onsubmit="saveServiceEdit(event)">
+                    <div class="form-group">
+                        <label for="editUpstreamUrl">Upstream URL:</label>
+                        <input type="text" id="editUpstreamUrl" name="upstream_url" required class="form-input">
+                        <small>Changing the URL will create a new unapproved snapshot</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="editCheckFrequency">Check Frequency (minutes):</label>
+                        <input type="number" id="editCheckFrequency" name="check_frequency_minutes" min="0" required class="form-input">
+                        <small>Set to 0 to disable automatic checks</small>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal for client config -->
+        <div id="clientConfigModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeClientConfigModal()">&times;</span>
+                <h2>MCP Client Configuration</h2>
+                <p>Copy this configuration snippet to your MCP client:</p>
+                <div id="clientConfigContent">
+                    <p class="loading">Loading configuration...</p>
                 </div>
             </div>
         </div>
@@ -56,14 +88,19 @@
                         <span class="badge ${service.enabled ? 'badge-success' : 'badge-warning'}">
                             ${service.enabled ? 'Enabled' : 'Disabled'}
                         </span>
-                    </div>
-                    <div class="service-info">
+                    </div>                    <div class="service-info">
                         <p><strong>Upstream URL:</strong> ${service.upstream_url}</p>
                         <p><strong>Check Frequency:</strong> ${service.check_frequency_minutes} minutes</p>
+                        <p><strong>Last Checked:</strong> ${service.latest_snapshot_created_at ? new Date(service.latest_snapshot_created_at).toLocaleString() : 'Never'}</p>
                         <p><strong>Created:</strong> ${new Date(service.created_at).toLocaleString()}</p>
                         <p><strong>Updated:</strong> ${new Date(service.updated_at).toLocaleString()}</p>
-                    </div>
-                    <div class="service-actions">
+                    </div>                    <div class="service-actions">
+                        <button class="btn btn-secondary" onclick="openEditModal()">
+                            ✏️ Edit Service
+                        </button>
+                        <button class="btn btn-primary" onclick="openClientConfigModal()">
+                            📋 Copy Client Config
+                        </button>
                         <button class="btn ${service.enabled ? 'btn-warning' : 'btn-success'}" 
                                 onclick="toggleService('${service.name}', ${!service.enabled})">
                             ${service.enabled ? 'Disable' : 'Enable'}
@@ -272,17 +309,139 @@
             } catch (error) {
                 content.innerHTML = `<p class="error">Error loading snapshot: ${error.message}</p>`;
             }
-        }
-
-        function closeSnapshotModal() {
+        }        function closeSnapshotModal() {
             document.getElementById('snapshotModal').style.display = 'none';
         }
 
-        // Close modal when clicking outside of it
+        function openEditModal() {
+            const modal = document.getElementById('editModal');
+            // Pre-fill form with current values
+            loadServiceDetails().then(() => {
+                // We need to store current service data
+                fetchWithAuth(`/api/admin/services/${SERVICE_NAME}`)
+                    .then(response => response.json())
+                    .then(service => {
+                        document.getElementById('editUpstreamUrl').value = service.upstream_url;
+                        document.getElementById('editCheckFrequency').value = service.check_frequency_minutes;
+                        modal.style.display = 'block';
+                    })
+                    .catch(error => {
+                        alert(`Error loading service data: ${error.message}`);
+                    });
+            });
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }        async function saveServiceEdit(event) {
+            event.preventDefault();
+            
+            const upstreamUrl = document.getElementById('editUpstreamUrl').value;
+            const checkFrequency = parseInt(document.getElementById('editCheckFrequency').value);
+            
+            try {
+                const response = await fetchWithAuth(`/api/admin/services/${SERVICE_NAME}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        upstream_url: upstreamUrl,
+                        check_frequency_minutes: checkFrequency
+                    })
+                });
+                
+                if (response.ok) {
+                    closeEditModal();
+                    alert('Service updated successfully!');
+                    location.reload();
+                } else {
+                    const error = await response.json();
+                    alert(`Error: ${error.detail}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        async function openClientConfigModal() {
+            const modal = document.getElementById('clientConfigModal');
+            const content = document.getElementById('clientConfigContent');
+            
+            modal.style.display = 'block';
+            content.innerHTML = '<p class="loading">Loading configuration...</p>';
+            
+            try {
+                const response = await fetchWithAuth(`/api/admin/services/${SERVICE_NAME}/client-config`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    content.innerHTML = `<p class="error">Failed to load configuration: ${errorText}</p>`;
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                let html = '<div class="config-display">';
+                html += '<p>Add this to your MCP client configuration:</p>';
+                html += '<div class="config-code-container">';
+                html += `<pre class="config-code" id="configCode">${data.config_string}</pre>`;
+                html += '</div>';
+                html += '<button class="btn btn-primary" onclick="copyClientConfig()">📋 Copy to Clipboard</button>';
+                html += '<hr style="margin: 20px 0; border: none; border-top: 1px solid var(--gray-200);">';
+                html += '<details>';
+                html += '<summary><strong>Full JSON Example</strong></summary>';
+                html += '<p style="margin-top: 10px;"><em>Example of a complete MCP client config file:</em></p>';
+                html += '<pre class="json-dump">{';
+                html += `\n  "mcpServers": {`;
+                html += `\n    ${data.config_string.replace(/\n/g, '\n    ')}`;
+                html += `\n  }`;
+                html += '\n}</pre>';
+                html += '</details>';
+                html += '</div>';
+                
+                content.innerHTML = html;
+            } catch (error) {
+                content.innerHTML = `<p class="error">Error loading configuration: ${error.message}</p>`;
+            }
+        }
+
+        function closeClientConfigModal() {
+            document.getElementById('clientConfigModal').style.display = 'none';
+        }
+
+        async function copyClientConfig() {
+            const codeElement = document.getElementById('configCode');
+            const text = codeElement.textContent;
+            
+            try {
+                await navigator.clipboard.writeText(text);
+                alert('Configuration copied to clipboard!');
+            } catch (error) {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert('Configuration copied to clipboard!');
+                } catch (err) {
+                    alert('Failed to copy. Please copy manually.');
+                }
+                document.body.removeChild(textArea);
+            }
+        }        // Close modal when clicking outside of it
         window.onclick = function(event) {
-            const modal = document.getElementById('snapshotModal');
-            if (event.target == modal) {
+            const snapshotModal = document.getElementById('snapshotModal');
+            const editModal = document.getElementById('editModal');
+            const clientConfigModal = document.getElementById('clientConfigModal');
+            if (event.target == snapshotModal) {
                 closeSnapshotModal();
+            } else if (event.target == editModal) {
+                closeEditModal();
+            } else if (event.target == clientConfigModal) {
+                closeClientConfigModal();
             }
         }
 

@@ -55,6 +55,9 @@ class Settings:
         self.port: int = 8000
         self.log_level: str = "INFO"
         
+        # Base URL for MCP Guardian (used in client configs)
+        self.base_url: str = self.config_data.get("base_url", "http://localhost:8000")
+        
         # Runtime: generate random password if not provided
         self.admin_password: str = self._get_admin_password()
     

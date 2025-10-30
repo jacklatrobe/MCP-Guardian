@@ -127,6 +127,15 @@ main {
     background: #dc2626;
 }
 
+.btn-secondary {
+    background: var(--gray-300);
+    color: var(--gray-800);
+}
+
+.btn-secondary:hover {
+    background: var(--gray-400);
+}
+
 .btn-sm {
     padding: 6px 12px;
     font-size: 0.85rem;
@@ -289,12 +298,21 @@ code {
 }
 
 .form-group input[type="text"],
-.form-group input[type="number"] {
+.form-group input[type="number"],
+.form-input {
     width: 100%;
     padding: 10px;
     border: 1px solid var(--gray-300);
     border-radius: 6px;
     font-size: 0.95rem;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="number"]:focus,
+.form-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
 .form-group small {
@@ -462,4 +480,34 @@ details[open] summary {
     line-height: 1.5;
     max-height: 500px;
     overflow-y: auto;
+}
+
+/* Client Config Display */
+.config-display {
+    margin-top: 15px;
+}
+
+.config-code-container {
+    background: var(--gray-50);
+    border: 2px solid var(--gray-300);
+    border-radius: 6px;
+    padding: 15px;
+    margin: 15px 0;
+}
+
+.config-code {
+    background: var(--gray-900);
+    color: #10b981;
+    padding: 15px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin: 0;
+    white-space: pre;
+}
+
+.config-display button {
+    margin-bottom: 10px;
 }

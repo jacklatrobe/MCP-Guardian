@@ -140,7 +140,7 @@ async def list_services(db: AsyncSession = Depends(get_db)):
     return response
 
 
-@router.get("/services/{name}", response_model=ServiceResponse, dependencies=[Depends(get_current_admin)])
+@router.get("/services/{name}", response_model=ServiceWithStatus, dependencies=[Depends(get_current_admin)])
 async def get_service(name: str, db: AsyncSession = Depends(get_db)):
     """Get a specific service by name."""
     result = await db.execute(select(MCPService).where(MCPService.name == name))
@@ -149,7 +149,41 @@ async def get_service(name: str, db: AsyncSession = Depends(get_db)):
     if not service:
         raise HTTPException(status_code=404, detail=f"Service '{name}' not found")
     
-    return service
+    # Get latest snapshot
+    snapshot_result = await db.execute(
+        select(MCPSnapshot)
+        .where(MCPSnapshot.service_id == service.id)
+        .order_by(desc(MCPSnapshot.created_at))
+        .limit(1)
+    )
+    latest_snapshot = snapshot_result.scalar_one_or_none()
+    
+    # Get latest approved snapshot
+    approved_result = await db.execute(
+        select(MCPSnapshot)
+        .where(
+            MCPSnapshot.service_id == service.id,
+            MCPSnapshot.approved_status.in_([ApprovalStatus.USER_APPROVED, ApprovalStatus.SYSTEM_APPROVED])
+        )
+        .order_by(desc(MCPSnapshot.created_at))
+        .limit(1)
+    )
+    approved_snapshot = approved_result.scalar_one_or_none()
+    
+    service_dict = {
+        "id": service.id,
+        "name": service.name,
+        "upstream_url": service.upstream_url,
+        "enabled": service.enabled,
+        "check_frequency_minutes": service.check_frequency_minutes,
+        "created_at": service.created_at,
+        "updated_at": service.updated_at,
+        "latest_snapshot_status": latest_snapshot.approved_status if latest_snapshot else None,
+        "latest_snapshot_created_at": latest_snapshot.created_at if latest_snapshot else None,
+        "latest_approved_hash": approved_snapshot.snapshot_hash if approved_snapshot else None,
+    }
+    
+    return service_dict
 
 
 @router.patch("/services/{name}", response_model=ServiceResponse, dependencies=[Depends(get_current_admin)])
@@ -426,3 +460,28 @@ async def approve_latest_snapshot(name: str, db: AsyncSession = Depends(get_db))
         new_status=ApprovalStatus.USER_APPROVED,
         enabled=True,
     )
+
+
+@router.get("/services/{name}/client-config", dependencies=[Depends(get_current_admin)])
+async def get_client_config(name: str, db: AsyncSession = Depends(get_db)):
+    """Get MCP client configuration snippet for a service."""
+    result = await db.execute(select(MCPService).where(MCPService.name == name))
+    service = result.scalar_one_or_none()
+    
+    if not service:
+        raise HTTPException(status_code=404, detail=f"Service '{name}' not found")
+    
+    # Generate the client config
+    mcp_url = f"{settings.base_url.rstrip('/')}/{service.name}/mcp"
+    
+    config = {
+        service.name: {
+            "url": mcp_url
+        }
+    }
+    
+    return {
+        "service_name": service.name,
+        "config": config,
+        "config_string": f'"{service.name}": {{\n  "url": "{mcp_url}"\n}}'
+    }
